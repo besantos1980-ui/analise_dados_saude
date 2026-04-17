@@ -141,4 +141,95 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
 
     out = out.reset_index()
     out = out[
-    ]
+    
+        [
+            "REGISTRO_OPERADORA",
+            "Nome_Fantasia",
+            "Modalidade",
+            "BLOCO_1",
+            "BLOCO_2",
+            "AUX_RES_O_BRU",
+        ]
+    ].sort_values(["REGISTRO_OPERADORA"])
+
+    return out
+
+
+def main(input_file: str, output_file: str):
+    input_path = Path(input_file)
+    output_path = Path(output_file)
+
+    if not input_path.exists():
+        raise FileNotFoundError(f"Arquivo de entrada não encontrado: {input_path.resolve()}")
+
+    df = pd.read_excel(input_path, engine="openpyxl")
+
+    required_cols = {
+        "REGISTRO_OPERADORA",
+        "Nome_Fantasia",
+        "Modalidade",
+        "Trimestre",
+        "CD_CONTA_CONTABIL",
+        "Diferenca",
+    }
+    missing = required_cols - set(df.columns)
+    if missing:
+        raise ValueError(f"Colunas ausentes no Excel de entrada: {sorted(missing)}")
+
+    # Normalizações robustas
+    df["REGISTRO_OPERADORA"] = df["REGISTRO_OPERADORA"].astype(str).str.strip()
+
+    # Evita NaN virar "NAN"
+    df["Trimestre"] = df["Trimestre"].astype("string").str.strip().str.upper()
+    df = df[df["Trimestre"].notna() & (df["Trimestre"] != "")]
+
+    df["CD_CONTA_CONTABIL"] = pd.to_numeric(df["CD_CONTA_CONTABIL"], errors="coerce").astype("Int64")
+    df["Diferenca"] = pd.to_numeric(df["Diferenca"], errors="coerce").fillna(0)
+
+    validar_consistencia(df)
+
+    trimestres = sorted(df["Trimestre"].unique(), key=trimestre_sort_key)
+
+    print("Trimestres únicos:", trimestres)
+    print("Qtd trimestres:", len(trimestres))
+    print("Linhas totais:", len(df))
+
+    if len(trimestres) == 0:
+        raise ValueError("Nenhum trimestre encontrado na coluna Trimestre. Não há abas para gerar.")
+
+    with pd.ExcelWriter(output_path, engine="openpyxl", mode="w") as writer:
+        resumo_parts = []
+
+        for tri in trimestres:
+            df_q = df[df["Trimestre"].eq(tri)].copy()
+            sheet_df = build_quarter_sheet(df_q)
+
+            # Para o Resumo
+            sheet_df.insert(0, "Trimestre", tri)
+            resumo_parts.append(sheet_df)
+
+            # Aba do trimestre
+            sheet_name = sanitize_sheet_name(tri)
+            sheet_df.drop(columns=["Trimestre"]).to_excel(writer, sheet_name=sheet_name, index=False)
+
+        # Aba Resumo
+        resumo = pd.concat(resumo_parts, ignore_index=True)
+        keys = resumo["Trimestre"].map(trimestre_sort_key)
+        resumo["__ano__"] = keys.map(lambda t: t[0])
+        resumo["__tri__"] = keys.map(lambda t: t[1])
+        resumo = resumo.sort_values(["__ano__", "__tri__", "REGISTRO_OPERADORA"]).drop(columns=["__ano__", "__tri__"])
+        resumo.to_excel(writer, sheet_name="Resumo", index=False)
+
+    print(f"✅ Novo arquivo gerado: {output_path.resolve()}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Gera NOVO Excel com uma aba por trimestre + aba Resumo; valida consistência de Nome_Fantasia e Modalidade."
+    )
+    parser.add_argument("--input", required=True, help="Excel de entrada (saída do 1º script).")
+    parser.add_argument("--output", required=True, help="Excel de saída (novo arquivo com abas).")
+    args = parser.parse_args()
+
+    main(args.input, args.output)
+
