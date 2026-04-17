@@ -7,8 +7,8 @@ import pandas as pd
 # =========================
 # CONFIGURÁVEL (contas EXATAS)
 # =========================
-EVENTOS_CONTAS = {331, 332, 333, 34}   # bloco 1 (somar)
-CONTA_41 = {441, 442}                 # bloco 2 (subtrair)
+BLOCO_1 = {331, 332, 333, 34}   # somar
+BLOCO_2 = {441, 442}           # subtrair
 
 
 def sanitize_sheet_name(name: str) -> str:
@@ -68,7 +68,7 @@ def validar_consistencia(df: pd.DataFrame):
         amostra = (
             nf[nf["REGISTRO_OPERADORA"].isin(inconsist_nf)]
             .groupby("REGISTRO_OPERADORA")["Nome_Fantasia"]
-            .apply(lambda s: sorted(set([v for v in s.dropna().tolist()]))[:5])
+            .apply(lambda s: sorted(set(s.dropna().tolist()))[:5])
         )
         problemas.append(("Nome_Fantasia", amostra))
 
@@ -86,7 +86,7 @@ def validar_consistencia(df: pd.DataFrame):
         amostra = (
             md[md["REGISTRO_OPERADORA"].isin(inconsist_md)]
             .groupby("REGISTRO_OPERADORA")["Modalidade"]
-            .apply(lambda s: sorted(set([v for v in s.dropna().tolist()]))[:5])
+            .apply(lambda s: sorted(set(s.dropna().tolist()))[:5])
         )
         problemas.append(("Modalidade", amostra))
 
@@ -106,9 +106,9 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
     Para um trimestre, agrega por operadora:
     - Nome_Fantasia
     - Modalidade
-    - Contas de receitas auxiliares resobru = soma(EVENTOS_CONTAS)
-    - 41 = soma(CONTA_41)
-    - AUX_RES_O_BRU = (bloco 1) - (bloco 2)
+    - Bloco 1 (somar) = soma(BLOCO_1)
+    - Bloco 2 (subtrair) = soma(BLOCO_2)
+    - AUX_RES_O_BRU = (Bloco 1) - (Bloco 2)
     """
     meta = (
         df_q.sort_values(["REGISTRO_OPERADORA"])
@@ -120,90 +120,25 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
     )
 
     bloco1 = (
-        df_q[df_q["CD_CONTA_CONTABIL"].isin(EVENTOS_CONTAS)]
+        df_q[df_q["CD_CONTA_CONTABIL"].isin(BLOCO_1)]
           .groupby("REGISTRO_OPERADORA")["Diferenca"]
           .sum()
-          .rename("Contas de receitas auxiliares resobru")
+          .rename("BLOCO_1")
     )
 
     bloco2 = (
-        df_q[df_q["CD_CONTA_CONTABIL"].isin(CONTA_41)]
+        df_q[df_q["CD_CONTA_CONTABIL"].isin(BLOCO_2)]
           .groupby("REGISTRO_OPERADORA")["Diferenca"]
           .sum()
-          .rename("41")
+          .rename("BLOCO_2")
     )
 
     out = meta.join(bloco1, how="left").join(bloco2, how="left")
-    out["Contas de receitas auxiliares resobru"] = out["Contas de receitas auxiliares resobru"].fillna(0)
-    out["41"] = out["41"].fillna(0)
+    out["BLOCO_1"] = out["BLOCO_1"].fillna(0)
+    out["BLOCO_2"] = out["BLOCO_2"].fillna(0)
 
-    # ✅ aqui é SUBTRAÇÃO
-    out["AUX_RES_O_BRU"] = out["Contas de receitas auxiliares resobru"] - out["41"]
+    out["AUX_RES_O_BRU"] = out["BLOCO_1"] - out["BLOCO_2"]
 
     out = out.reset_index()
     out = out[
         [
-            "REGISTRO_OPERADORA",
-            "Nome_Fantasia",
-            "Modalidade",
-            "Contas de receitas auxiliares resobru",
-            "41",
-            "AUX_RES_O_BRU",
-        ]
-    ].sort_values(["REGISTRO_OPERADORA"])
-
-    return out
-
-
-def main(input_file: str, output_file: str):
-    input_path = Path(input_file)
-    output_path = Path(output_file)
-
-    if not input_path.exists():
-        raise FileNotFoundError(f"Arquivo de entrada não encontrado: {input_path.resolve()}")
-
-    df = pd.read_excel(input_path, engine="openpyxl")
-
-    required_cols = {
-        "REGISTRO_OPERADORA",
-        "Nome_Fantasia",
-        "Modalidade",
-        "Trimestre",
-        "CD_CONTA_CONTABIL",
-        "Diferenca",
-    }
-    missing = required_cols - set(df.columns)
-    if missing:
-        raise ValueError(f"Colunas ausentes no Excel de entrada: {sorted(missing)}")
-
-    # Normalizações de tipo (robustas)
-    df["REGISTRO_OPERADORA"] = df["REGISTRO_OPERADORA"].astype(str).str.strip()
-
-    # evita NaN virar "NAN"
-    df["Trimestre"] = df["Trimestre"].astype("string").str.strip().str.upper()
-    df = df[df["Trimestre"].notna() & (df["Trimestre"] != "")]
-
-    df["CD_CONTA_CONTABIL"] = pd.to_numeric(df["CD_CONTA_CONTABIL"], errors="coerce").astype("Int64")
-    df["Diferenca"] = pd.to_numeric(df["Diferenca"], errors="coerce").fillna(0)
-
-    # Validação global
-    validar_consistencia(df)
-
-    # Trimestres únicos ordenados
-    trimestres = sorted(df["Trimestre"].unique(), key=trimestre_sort_key)
-
-    print("Trimestres únicos:", trimestres)
-    print("Qtd trimestres:", len(trimestres))
-    print("Linhas totais:", len(df))
-    print("Trimestre head:", df["Trimestre"].head(10).tolist())
-
-    if len(trimestres) == 0:
-        raise ValueError("Nenhum trimestre encontrado na coluna Trimestre. Não há abas para gerar.")
-
-    # ExcelWriter é o modo correto para gerar múltiplas abas em um único arquivo. [1](https://bing.com/search?q=GitHub+Codespaces+prebuild+billing)[2](https://medium.com/@udtc.us/understanding-the-cost-of-github-codespaces-a-deep-dive-into-2-core-instances-913a110eefb3)
-    with pd.ExcelWriter(output_path, engine="openpyxl", mode="w") as writer:
-        resumo_parts = []
-
-        for tri in trimestres:
-            df_q = df[df["Trimestre"].eq(tri)].copy()
-
