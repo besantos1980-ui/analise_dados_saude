@@ -95,7 +95,7 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
     Para um trimestre, agrega por operadora:
     - Nome_Fantasia
     - Modalidade
-    - Eventos e Indenizações Líquidas = soma(31,311,312,32)
+    - Contraprestações Efetivas/Prêmios Ganhos de Assistência à Saúde = soma(311,312,32)
     - 41 = soma(conta 41)
     - RES_OPERACIONAL = Eventos - 41
     """
