@@ -46,41 +46,36 @@ def validar_consistencia(df: pd.DataFrame):
     """
     problemas = []
 
-    # Nome_Fantasia
-    nf = (
-        df[["REGISTRO_OPERADORA", "Nome_Fantasia"]]
-        .dropna(subset=["REGISTRO_OPERADORA"])
-        .copy()
-    )
-    nf["Nome_Fantasia"] = nf["Nome_Fantasia"].astype(str).str.strip()
+    def _prep_str(s: pd.Series) -> pd.Series:
+        s = s.astype("string").str.strip()
+        s = s.replace("", pd.NA)
+        return s
 
-    g_nf = nf.groupby("REGISTRO_OPERADORA")["Nome_Fantasia"].nunique(dropna=True)
+    # Nome_Fantasia
+    nf = df[["REGISTRO_OPERADORA", "Nome_Fantasia"]].copy()
+    nf["Nome_Fantasia"] = _prep_str(nf["Nome_Fantasia"])
+    g_nf = nf.dropna(subset=["REGISTRO_OPERADORA"]).groupby("REGISTRO_OPERADORA")["Nome_Fantasia"].nunique(dropna=True)
     inconsist_nf = g_nf[g_nf > 1].index.tolist()
 
     if inconsist_nf:
         amostra = (
             nf[nf["REGISTRO_OPERADORA"].isin(inconsist_nf)]
             .groupby("REGISTRO_OPERADORA")["Nome_Fantasia"]
-            .apply(lambda s: sorted(set(v for v in s if v and v.lower() != "nan"))[:5])
+            .apply(lambda s: sorted(set([v for v in s.dropna().tolist()]))[:5])
         )
         problemas.append(("Nome_Fantasia", amostra))
 
     # Modalidade
-    md = (
-        df[["REGISTRO_OPERADORA", "Modalidade"]]
-        .dropna(subset=["REGISTRO_OPERADORA"])
-        .copy()
-    )
-    md["Modalidade"] = md["Modalidade"].astype(str).str.strip()
-
-    g_md = md.groupby("REGISTRO_OPERADORA")["Modalidade"].nunique(dropna=True)
+    md = df[["REGISTRO_OPERADORA", "Modalidade"]].copy()
+    md["Modalidade"] = _prep_str(md["Modalidade"])
+    g_md = md.dropna(subset=["REGISTRO_OPERADORA"]).groupby("REGISTRO_OPERADORA")["Modalidade"].nunique(dropna=True)
     inconsist_md = g_md[g_md > 1].index.tolist()
 
     if inconsist_md:
         amostra = (
             md[md["REGISTRO_OPERADORA"].isin(inconsist_md)]
             .groupby("REGISTRO_OPERADORA")["Modalidade"]
-            .apply(lambda s: sorted(set(v for v in s if v and v.lower() != "nan"))[:5])
+            .apply(lambda s: sorted(set([v for v in s.dropna().tolist()]))[:5])
         )
         problemas.append(("Modalidade", amostra))
 
@@ -88,7 +83,6 @@ def validar_consistencia(df: pd.DataFrame):
         msg = ["❌ Inconsistência detectada por REGISTRO_OPERADORA:"]
         for campo, serie in problemas:
             msg.append(f"\nCampo: {campo}")
-            # mostra até 20 operadoras na mensagem para não explodir o terminal
             for op, vals in serie.head(20).items():
                 msg.append(f"  - {op}: {vals}")
             if len(serie) > 20:
@@ -99,8 +93,8 @@ def validar_consistencia(df: pd.DataFrame):
 def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
     """
     Para um trimestre, agrega por operadora:
-    - Nome_Fantasia (primeiro valor)
-    - Modalidade (primeiro valor)
+    - Nome_Fantasia
+    - Modalidade
     - Eventos e Indenizações Líquidas = soma(31,311,312,32)
     - 41 = soma(conta 41)
     - RES_OPERACIONAL = Eventos - 41
@@ -166,43 +160,40 @@ def main(input_file: str, output_file: str):
     if missing:
         raise ValueError(f"Colunas ausentes no Excel de entrada: {sorted(missing)}")
 
-    # Normalizações de tipo
-    df["REGISTRO_OPERADORA"] = df["REGISTRO_OPERADORA"]
+    # Normalizações de tipo (recomendado)
+    df["REGISTRO_OPERADORA"] = df["REGISTRO_OPERADORA"].astype(str).str.strip()
     df["Trimestre"] = df["Trimestre"].astype(str).str.strip().str.upper()
-
     df["CD_CONTA_CONTABIL"] = pd.to_numeric(df["CD_CONTA_CONTABIL"], errors="coerce").astype("Int64")
     df["Diferenca"] = pd.to_numeric(df["Diferenca"], errors="coerce").fillna(0)
 
-    # ✅ Validação global (arquivo inteiro)
+    # Validação global
     validar_consistencia(df)
 
     # Trimestres únicos ordenados
     trimestres = sorted(df["Trimestre"].dropna().unique(), key=trimestre_sort_key)
 
-    # Escreve NOVO arquivo com abas por trimestre + Resumo
-    # O ExcelWriter em modo "w" cria/reescreve o arquivo de saída. [2](https://medium.com/@udtc.us/understanding-the-cost-of-github-codespaces-a-deep-dive-into-2-core-instances-913a110eefb3)[1](https://bing.com/search?q=GitHub+Codespaces+prebuild+billing)
     with pd.ExcelWriter(output_path, engine="openpyxl", mode="w") as writer:
-        # Aba Resumo (empilhada)
         resumo_parts = []
 
         for tri in trimestres:
             df_q = df[df["Trimestre"].eq(tri)].copy()
             sheet_df = build_quarter_sheet(df_q)
-            sheet_df.insert(0, "Trimestre", tri)  # adiciona coluna trimestre no resumo
+            sheet_df.insert(0, "Trimestre", tri)
 
-            # guarda para o Resumo
             resumo_parts.append(sheet_df)
 
-            # escreve aba do trimestre
             sheet_name = sanitize_sheet_name(tri)
             sheet_df.drop(columns=["Trimestre"]).to_excel(writer, sheet_name=sheet_name, index=False)
 
-        # escreve a aba Resumo
         if resumo_parts:
             resumo = pd.concat(resumo_parts, ignore_index=True)
-            # ordenação: trimestre cronológico e operadora
-            resumo["__sort__"] = resumo["Trimestre"].map(lambda x: trimestre_sort_key(x)[0] * 10 + trimestre_sort_key(x)[1])
-            resumo = resumo.sort_values(["__sort__", "REGISTRO_OPERADORA"]).drop(columns="__sort__")
+
+            # ordena de forma eficiente
+            keys = resumo["Trimestre"].map(trimestre_sort_key)
+            resumo["__ano__"] = keys.map(lambda t: t[0])
+            resumo["__tri__"] = keys.map(lambda t: t[1])
+
+            resumo = resumo.sort_values(["__ano__", "__tri__", "REGISTRO_OPERADORA"]).drop(columns=["__ano__", "__tri__"])
             resumo.to_excel(writer, sheet_name="Resumo", index=False)
 
     print(f"✅ Novo arquivo gerado: {output_path.resolve()}")
@@ -213,3 +204,7 @@ if __name__ == "__main__":
         description="Gera NOVO Excel com uma aba por trimestre (1T2023) + aba Resumo; valida consistência de Nome_Fantasia e Modalidade."
     )
     parser.add_argument("--input", required=True, help="Excel de entrada (saída do 1º script).")
+    parser.add_argument("--output", required=True, help="Excel de saída (novo arquivo com abas).")
+    args = parser.parse_args()
+
+    main(args.input, args.output)
