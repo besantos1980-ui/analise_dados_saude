@@ -38,7 +38,7 @@ def processar_contabeis():
     all_chunks = []
     
     # Transformando as contas de interesse em strings para evitar falha no filtro
-    contas_alvo = ['31', '311', '312', '32', '41']
+    contas_alvo = ['331', '332', '333', '34', '441', '442']
     
     for ano in anos:
         for t in range(1, 5):
