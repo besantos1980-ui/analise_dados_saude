@@ -208,3 +208,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args.input, args.output)
+
+#Para rodar, usar: python .\gerar_resoper.py --input .\arquivo_base_resoper_17_04_2026.xlsx --output .\resoper_por_trimestre.xlsx
