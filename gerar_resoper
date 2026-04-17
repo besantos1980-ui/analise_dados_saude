@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-EVENTOS_CONTAS = {311, 3117, 3119}
+EVENTOS_CONTAS = {31, 311, 312, 32}
 CONTA_41 = 41
 
 
@@ -101,7 +101,7 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
     Para um trimestre, agrega por operadora:
     - Nome_Fantasia (primeiro valor)
     - Modalidade (primeiro valor)
-    - Eventos e Indenizações Líquidas = soma(311,3117,3119)
+    - Eventos e Indenizações Líquidas = soma(31,311,312,32)
     - 41 = soma(conta 41)
     - RES_OPERACIONAL = Eventos - 41
     """
