@@ -122,7 +122,7 @@ def main():
         
         print(f'Merge: {len(df_final)} linhas')
         if len(df_final) > 0:
-            filename = f'arquivo_base_resoper_{datetime.today().strftime("%d_%m_%Y")}.xlsx'
+            filename = f'arquivo_base_resobru_{datetime.today().strftime("%d_%m_%Y")}.xlsx'
             # Necessita 'pip install openpyxl'
             df_final.to_excel(filename, index=False)
             print(f'Arquivo Excel salvo: {filename}')
