@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
-EVENTOS_CONTAS = {311, 312, 32}
-CONTA_41 = 41
+EVENTOS_CONTAS = {331, 332, 333, 34}
+CONTA_41 = {441, 442}
 
 
 def sanitize_sheet_name(name: str) -> str:
@@ -95,9 +95,9 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
     Para um trimestre, agrega por operadora:
     - Nome_Fantasia
     - Modalidade
-    - Contraprestações Efetivas/Prêmios Ganhos de Assistência à Saúde = soma(311,312,32)
-    - 41 = soma(conta 41)
-    - RES_OPERACIONAL = Eventos - 41
+    - Contas de receitas auxiliares resobru = soma(331,332,333, 34)
+    - 41 = soma(441,442)
+    - RESBRU = soma
     """
     meta = (
         df_q.sort_values(["REGISTRO_OPERADORA"])
@@ -112,7 +112,7 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
         df_q[df_q["CD_CONTA_CONTABIL"].isin(EVENTOS_CONTAS)]
           .groupby("REGISTRO_OPERADORA")["Diferenca"]
           .sum()
-          .rename("Contraprestações Efetivas/Prêmios Ganhos de Assistência à Saúde")
+          .rename("Contas de receitas auxiliares resobru")
     )
 
     v41 = (
@@ -123,9 +123,9 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
     )
 
     out = meta.join(eventos, how="left").join(v41, how="left")
-    out["Contraprestações Efetivas/Prêmios Ganhos de Assistência à Saúde"] = out["Contraprestações Efetivas/Prêmios Ganhos de Assistência à Saúde"].fillna(0)
+    out["Contas de receitas auxiliares resobru"] = out["Contas de receitas auxiliares resobru"].fillna(0)
     out["41"] = out["41"].fillna(0)
-    out["RES_OPERACIONAL"] = out["Contraprestações Efetivas/Prêmios Ganhos de Assistência à Saúde"] - out["41"]
+    out["AUX_RES_O_BRU"] = out["Contas de receitas auxiliares resobru"] + out["41"]
 
     out = out.reset_index()
     out = out[
@@ -133,9 +133,9 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
             "REGISTRO_OPERADORA",
             "Nome_Fantasia",
             "Modalidade",
-            "Contraprestações Efetivas/Prêmios Ganhos de Assistência à Saúde",
+            "CContas de receitas auxiliares resobru",
             "41",
-            "RES_OPERACIONAL",
+            "AUX_RES_O_BRU",
         ]
     ].sort_values(["REGISTRO_OPERADORA"])
 
@@ -209,4 +209,4 @@ if __name__ == "__main__":
 
     main(args.input, args.output)
 
-#Para rodar, usar: python .\gerar_resoper.py --input .\arquivo_base_resoper_17_04_2026.xlsx --output .\resoper_por_trimestre.xlsx
+#Para rodar, usar: python .\gerar_resobru.py --input .\arquivo_base_resoper_17_04_2026.xlsx --output .\resobru_por_trimestre.xlsx
