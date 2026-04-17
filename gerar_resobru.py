@@ -141,4 +141,4 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
 
     out = out.reset_index()
     out = out[
-        [
+    ]
