@@ -133,8 +133,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    else:
-        print('Dados insuficientes para merge.')
-
-if __name__ == '__main__':
-    main()
