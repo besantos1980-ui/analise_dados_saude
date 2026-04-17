@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-EVENTOS_CONTAS = {31, 311, 312, 32}
+EVENTOS_CONTAS = {311, 312, 32}
 CONTA_41 = 41
 
 
