@@ -172,6 +172,11 @@ def main(input_file: str, output_file: str):
     # Trimestres únicos ordenados
     trimestres = sorted(df["Trimestre"].dropna().unique(), key=trimestre_sort_key)
 
+    print("Trimestres únicos:", trimestres)
+    print("Qtd trimestres:", len(trimestres))
+    print("Linhas totais:", len(df))
+    print("Trimestre head:", df["Trimestre"].head(10).tolist())
+
     with pd.ExcelWriter(output_path, engine="openpyxl", mode="w") as writer:
         resumo_parts = []
 
