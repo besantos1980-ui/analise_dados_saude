@@ -112,7 +112,7 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
         df_q[df_q["CD_CONTA_CONTABIL"].isin(EVENTOS_CONTAS)]
           .groupby("REGISTRO_OPERADORA")["Diferenca"]
           .sum()
-          .rename("Eventos e Indenizações Líquidas")
+          .rename("Contraprestações Efetivas/Prêmios Ganhos de Assistência à Saúde")
     )
 
     v41 = (
@@ -123,9 +123,9 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
     )
 
     out = meta.join(eventos, how="left").join(v41, how="left")
-    out["Eventos e Indenizações Líquidas"] = out["Eventos e Indenizações Líquidas"].fillna(0)
+    out["Contraprestações Efetivas/Prêmios Ganhos de Assistência à Saúde"] = out["Contraprestações Efetivas/Prêmios Ganhos de Assistência à Saúde"].fillna(0)
     out["41"] = out["41"].fillna(0)
-    out["RES_OPERACIONAL"] = out["Eventos e Indenizações Líquidas"] - out["41"]
+    out["RES_OPERACIONAL"] = out["Contraprestações Efetivas/Prêmios Ganhos de Assistência à Saúde"] - out["41"]
 
     out = out.reset_index()
     out = out[
@@ -133,7 +133,7 @@ def build_quarter_sheet(df_q: pd.DataFrame) -> pd.DataFrame:
             "REGISTRO_OPERADORA",
             "Nome_Fantasia",
             "Modalidade",
-            "Eventos e Indenizações Líquidas",
+            "Contraprestações Efetivas/Prêmios Ganhos de Assistência à Saúde",
             "41",
             "RES_OPERACIONAL",
         ]
