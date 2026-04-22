@@ -62,11 +62,10 @@ def main():
     # Coluna 10: Resultado Bruto (Resultado Op. Planos + AuxResBru)
     df_master['Resultado Bruto'] = df_master['Resultado'] + df_master['AuxResBru']
     
-    # Coluna 11: Resultado Operacional (Resultado Bruto - X)
-    df_master['Resultado Operacional'] = df_master['Resultado Bruto'] - df_master['X']
+    # Coluna 11: Resultado Operacional (Resultado Bruto + X) - CORRIGIDO PARA SOMA
+    df_master['Resultado Operacional'] = df_master['Resultado Bruto'] + df_master['X']
     
     # Coluna 14: Resultado Antes impostos (Resultado Operacional - Resultado Final Patrimonial)
-    # Nota: Usamos o sufixo _PATRIMONIAL definido no merge caso o nome colida
     df_master['Resultado Antes impostos'] = df_master['Resultado Operacional'] - df_master['Resultado Final']
     
     # Coluna 19: Resultado Líquido (Resultado Antes impostos - Resultado Final Impostos)
