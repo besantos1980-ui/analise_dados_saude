@@ -113,4 +113,85 @@ def processar_contabeis():
                                 chunk["Diferenca"] = chunk["VL_SALDO_FINAL"] - chunk["VL_SALDO_INICIAL"]
                                 chunk["Trimestre"] = trimestre
 
-                                out = chunk[["REG_ANS", "CD_
+                                out = chunk[["REG_ANS", "CD_CONTA_CONTABIL", "Diferenca", "Trimestre"]]
+                                trimestre_chunks.append(out)
+
+                    if trimestre_chunks:
+                        df_tri = pd.concat(trimestre_chunks, ignore_index=True)
+                        all_chunks.append(df_tri)
+                
+                print(f"OK: {trimestre}")
+
+            except requests.exceptions.HTTPError:
+                if response.status_code == 404:
+                    print(f"{trimestre}: arquivo não encontrado (404).")
+                else:
+                    print(f"{trimestre}: erro HTTP.")
+            except Exception as e:
+                print(f"Erro geral no contábil {trimestre}:", e)
+
+    if not all_chunks:
+        print("Nenhum dado contábil processado.")
+        return pd.DataFrame()
+
+    return pd.concat(all_chunks, ignore_index=True)
+
+# -------------------------
+# Principal 
+# -------------------------
+
+def main():
+    print("Iniciando extração dos dados contábeis...")
+    df_contabeis = processar_contabeis()
+
+    if df_contabeis.empty:
+        print("Sem contábeis para processar.")
+        return
+
+    print("\nProcessamento concluído. Agrupando e calculando os indicadores...")
+    
+    # 1. Cria a Pivot Table para transformar as contas em colunas
+    df_pivot = df_contabeis.pivot_table(
+        index=['REG_ANS', 'Trimestre'],
+        columns='CD_CONTA_CONTABIL',
+        values='Diferenca',
+        aggfunc='sum',
+        fill_value=0
+    ).reset_index()
+
+    # 2. Garante que todas as contas existam como coluna (evita erro se uma conta não aparecer no período)
+    contas_alvo = ["311", "312", "313", "32", "411", "414"]
+    for conta in contas_alvo:
+        if conta not in df_pivot.columns:
+            df_pivot[conta] = 0.0
+
+    # 3. Realiza as somas e subtrações solicitadas
+    df_pivot['Contraprestações efetivas'] = df_pivot['311'] + df_pivot['312'] + df_pivot['313'] + df_pivot['32']
+    df_pivot['Eventos Líquidos'] = df_pivot['411'] + df_pivot['414']
+    
+    # Nova coluna de subtração
+    df_pivot['Resultado'] = df_pivot['Contraprestações efetivas'] - df_pivot['Eventos Líquidos']
+
+    # 4. Filtra apenas as colunas finais (414 removida)
+    colunas_finais = [
+        'REG_ANS', 
+        'Trimestre', 
+        'Contraprestações efetivas', 
+        'Eventos Líquidos', 
+        'Resultado'
+    ]
+    df_final = df_pivot[colunas_finais].copy()
+
+    # 5. Salva o resultado em Excel
+    ts = datetime.today().strftime("%d_%m_%Y")
+    out_file = f"base_financeira_agrupada_{ts}.xlsx"
+    
+    df_final.to_excel(out_file, index=False)
+    
+    print("\n=== RESUMO ===")
+    print(f"Linhas geradas no arquivo: {len(df_final)}")
+    print(f"Operadoras únicas capturadas: {df_final['REG_ANS'].nunique()}")
+    print(f"Arquivo salvo com sucesso: {out_file}")
+
+if __name__ == "__main__":
+    main()
