@@ -177,4 +177,38 @@ def main():
             df_pivot[conta] = 0.0
 
     # 3. Aplica a nova fórmula de AuxResBru
-    df_pivot['AuxResBru'] = (df_pivot['331'] + df_pivot['33
+    df_pivot['AuxResBru'] = (df_pivot['331'] + df_pivot['332'] + df_pivot['333'] + df_pivot['34']) - \
+                            (df_pivot['441'] + df_pivot['442'])
+
+    # 4. Filtra e ordena as colunas para o arquivo final
+    colunas_finais = [
+        'REG_ANS', 
+        'Trimestre', 
+        '331', 
+        '332', 
+        '333', 
+        '34', 
+        '441', 
+        '442', 
+        'AuxResBru'
+    ]
+    df_final = df_pivot[colunas_finais].copy()
+
+    # 5. Converte REG_ANS para número estrito (Int64)
+    print("Convertendo REG_ANS para formato numérico...")
+    df_final['REG_ANS'] = pd.to_numeric(df_final['REG_ANS'], errors='coerce').astype('Int64')
+    df_final.dropna(subset=['REG_ANS'], inplace=True)
+
+    # 6. Salva o resultado em Excel
+    ts = datetime.today().strftime("%d_%m_%Y")
+    out_file = f"base_auxresbru_dinamica_{ts}.xlsx"
+    
+    df_final.to_excel(out_file, index=False)
+    
+    print("\n=== RESUMO ===")
+    print(f"Linhas geradas no arquivo: {len(df_final)}")
+    print(f"Operadoras únicas capturadas: {df_final['REG_ANS'].nunique()}")
+    print(f"Arquivo salvo com sucesso: {out_file}")
+
+if __name__ == "__main__":
+    main()
