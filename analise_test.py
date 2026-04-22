@@ -47,8 +47,8 @@ def processar_contabeis():
     anos = [2023, 2024, 2025]
     all_chunks = []
 
-    # Contas de interesse (incluindo a 412 pedida na soma e a 414 pedida na lista)
-    contas_alvo = ["311", "312", "313", "32", "411", "412", "414"]
+    # Contas de interesse atualizadas (removida a 412)
+    contas_alvo = ["311", "312", "313", "32", "411", "414"]
 
     for ano in anos:
         for t in range(1, 5):
@@ -113,84 +113,4 @@ def processar_contabeis():
                                 chunk["Diferenca"] = chunk["VL_SALDO_FINAL"] - chunk["VL_SALDO_INICIAL"]
                                 chunk["Trimestre"] = trimestre
 
-                                out = chunk[["REG_ANS", "CD_CONTA_CONTABIL", "Diferenca", "Trimestre"]]
-                                trimestre_chunks.append(out)
-
-                    if trimestre_chunks:
-                        df_tri = pd.concat(trimestre_chunks, ignore_index=True)
-                        all_chunks.append(df_tri)
-                
-                print(f"OK: {trimestre}")
-
-            except requests.exceptions.HTTPError:
-                if response.status_code == 404:
-                    print(f"{trimestre}: arquivo não encontrado (404).")
-                else:
-                    print(f"{trimestre}: erro HTTP.")
-            except Exception as e:
-                print(f"Erro geral no contábil {trimestre}:", e)
-
-    if not all_chunks:
-        print("Nenhum dado contábil processado.")
-        return pd.DataFrame()
-
-    return pd.concat(all_chunks, ignore_index=True)
-
-# -------------------------
-# Principal 
-# -------------------------
-
-def main():
-    print("Iniciando extração dos dados contábeis...")
-    df_contabeis = processar_contabeis()
-
-    if df_contabeis.empty:
-        print("Sem contábeis para processar.")
-        return
-
-    print("\nProcessamento concluído. Agrupando e somando as contas por operadora e trimestre...")
-    
-    # 1. Cria uma Pivot Table (tabela dinâmica) para transformar as contas de linhas para colunas
-    # Isso soma automaticamente se houver mais de um lançamento da mesma conta no mesmo trimestre
-    df_pivot = df_contabeis.pivot_table(
-        index=['REG_ANS', 'Trimestre'],
-        columns='CD_CONTA_CONTABIL',
-        values='Diferenca',
-        aggfunc='sum',
-        fill_value=0
-    ).reset_index()
-
-    # 2. Garante que todas as contas existam como coluna (caso alguma conta não venha em nenhum trimestre)
-    contas_alvo = ["311", "312", "313", "32", "411", "412", "414"]
-    for conta in contas_alvo:
-        if conta not in df_pivot.columns:
-            df_pivot[conta] = 0.0
-
-    # 3. Realiza as somas solicitadas
-    df_pivot['Contraprestações efetivas'] = df_pivot['311'] + df_pivot['312'] + df_pivot['313'] + df_pivot['32']
-    df_pivot['Eventos Líquidos'] = df_pivot['411'] + df_pivot['412']
-
-    # 4. Filtra apenas as colunas de interesse para o arquivo final
-    # A conta 414 foi incluída separadamente para não perder a informação solicitada na regra 2
-    colunas_finais = [
-        'REG_ANS', 
-        'Trimestre', 
-        'Contraprestações efetivas', 
-        'Eventos Líquidos', 
-        '414'
-    ]
-    df_final = df_pivot[colunas_finais].copy()
-
-    # 5. Salva o resultado
-    ts = datetime.today().strftime("%d_%m_%Y")
-    out_file = f"base_financeira_agrupada_{ts}.xlsx"
-    
-    df_final.to_excel(out_file, index=False)
-    
-    print("\n=== RESUMO ===")
-    print(f"Linhas geradas no arquivo: {len(df_final)}")
-    print(f"Operadoras únicas capturadas: {df_final['REG_ANS'].nunique()}")
-    print(f"Arquivo salvo com sucesso: {out_file}")
-
-if __name__ == "__main__":
-    main()
+                                out = chunk[["REG_ANS", "CD_
