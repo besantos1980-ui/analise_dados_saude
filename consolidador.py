@@ -46,14 +46,14 @@ def main():
         return
 
     # 2. Unir os arquivos (Merge Sequencial)
-    # Usamos outer join para não perder dados se uma operadora faltar em algum arquivo
     print("\nCruzando informações de todas as fontes...")
     df_master = df1.merge(df2, on=['REG_ANS', 'Trimestre'], how='outer')
     df_master = df_master.merge(df3, on=['REG_ANS', 'Trimestre'], how='outer')
+    # Suffixes para evitar colisão na coluna 'Resultado Final' entre o arquivo patrimonial e de impostos
     df_master = df_master.merge(df4, on=['REG_ANS', 'Trimestre'], how='outer', suffixes=('', '_PATRIMONIAL'))
     df_master = df_master.merge(df5, on=['REG_ANS', 'Trimestre'], how='outer', suffixes=('', '_IMPOSTOS'))
 
-    # Preencher valores nulos com 0 para cálculos
+    # Preencher valores nulos com 0 para evitar erros nos cálculos matemáticos
     df_master = df_master.fillna(0)
 
     # 3. Processar cálculos das colunas finais
@@ -62,16 +62,17 @@ def main():
     # Coluna 10: Resultado Bruto (Resultado Op. Planos + AuxResBru)
     df_master['Resultado Bruto'] = df_master['Resultado'] + df_master['AuxResBru']
     
-    # Coluna 11: Resultado Operacional (Resultado Bruto + X) - CORRIGIDO PARA SOMA
+    # Coluna 11: Resultado Operacional (Resultado Bruto + X)
     df_master['Resultado Operacional'] = df_master['Resultado Bruto'] + df_master['X']
     
-    # Coluna 14: Resultado Antes impostos (Resultado Operacional - Resultado Final Patrimonial)
-    df_master['Resultado Antes impostos'] = df_master['Resultado Operacional'] - df_master['Resultado Final']
+    # Coluna 14: Resultado Antes impostos (Resultado Operacional + Resultado Final Patrimonial)
+    # Nota: df_master['Resultado Final'] refere-se ao arquivo patrimonial devido à ordem do merge
+    df_master['Resultado Antes impostos'] = df_master['Resultado Operacional'] + df_master['Resultado Final']
     
     # Coluna 19: Resultado Líquido (Resultado Antes impostos - Resultado Final Impostos)
     df_master['Resultado Líquido'] = df_master['Resultado Antes impostos'] - df_master['Resultado Final_IMPOSTOS']
 
-    # 4. Organizar e renomear colunas para o formato final
+    # 4. Organizar e selecionar as colunas para o formato final
     df_final = df_master[[
         'REG_ANS', 'Trimestre', 
         'Contraprestações efetivas',       # Col 1
@@ -95,25 +96,26 @@ def main():
         'Resultado Líquido'                 # Col 19
     ]].copy()
 
-    # 5. Gerar arquivo Excel com abas por Trimestre
+    # 5. Gerar arquivo Excel com abas separadas por Trimestre
     ts = datetime.today().strftime("%d_%m_%Y")
     nome_saida = f"CONSOLIDADO_FINAL_ANS_{ts}.xlsx"
     
     print(f"\nGerando arquivo final: {nome_saida}")
     
     with pd.ExcelWriter(nome_saida, engine='openpyxl') as writer:
-        # Ordenar trimestres (mais recentes primeiro)
+        # Ordenar os trimestres do mais recente para o mais antigo
         trimestres = sorted(df_final['Trimestre'].unique(), reverse=True)
         
         for tri in trimestres:
             df_tri = df_final[df_final['Trimestre'] == tri].drop(columns=['Trimestre'])
-            # Ordenar por REG_ANS para facilitar a leitura
+            # Ordenar por REG_ANS dentro de cada aba
             df_tri = df_tri.sort_values('REG_ANS')
+            # Correção to_excel
             df_tri.to_excel(writer, sheet_name=str(tri), index=False)
 
     print(f"\n=== SUCESSO ===")
-    print(f"O arquivo {nome_saida} foi gerado com {len(trimestres)} abas.")
-    print("Processamento de toda a esteira ANS concluído.")
+    print(f"O arquivo {nome_saida} foi gerado com sucesso.")
+    print(f"Total de {len(trimestres)} trimestres consolidados.")
 
 if __name__ == "__main__":
     main()
