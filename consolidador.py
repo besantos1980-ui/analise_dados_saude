@@ -110,7 +110,7 @@ def main():
             df_tri = df_final[df_final['Trimestre'] == tri].drop(columns=['Trimestre'])
             # Ordenar por REG_ANS para facilitar a leitura
             df_tri = df_tri.sort_values('REG_ANS')
-            df_tri.to_sheet(writer, sheet_name=str(tri), index=False)
+            df_tri.to_excel(writer, sheet_name=str(tri), index=False)
 
     print(f"\n=== SUCESSO ===")
     print(f"O arquivo {nome_saida} foi gerado com {len(trimestres)} abas.")
